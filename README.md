@@ -6,8 +6,7 @@ of the page following the bottom of every streamed reply.**
 
 你的提问固定在聊天区顶部，回复向下生长，页面不再跟着滚动。
 
-[![npm](https://img.shields.io/npm/v/dsh-chat-anchor.svg)](https://www.npmjs.com/package/dsh-chat-anchor)
-[![license](https://img.shields.io/npm/l/dsh-chat-anchor.svg)](LICENSE)
+[![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 ## What it does
 
