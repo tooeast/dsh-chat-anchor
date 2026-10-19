@@ -39,11 +39,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/sansiro/dsh-chat-anchor.git"
+    "url": "git+https://github.com/tooeast/dsh-chat-anchor.git"
   },
-  "homepage": "https://github.com/sansiro/dsh-chat-anchor#readme",
+  "homepage": "https://github.com/tooeast/dsh-chat-anchor#readme",
   "bugs": {
-    "url": "https://github.com/sansiro/dsh-chat-anchor/issues"
+    "url": "https://github.com/tooeast/dsh-chat-anchor/issues"
   },
   "keywords": [
     "dsh",
