@@ -1,18 +1,11 @@
-# Changelog
+# 更新日志
 
 ## 1.7.0
 
-First public release.
+首个公开版本。
 
-- Anchors each new prompt when it is submitted — on the local submission echo,
-  before the durable record exists — instead of after the server echoes it.
-- Keeps the anchored position for short answers by reserving only the minimum
-  bottom room the scroll range needs; the room shrinks one-to-one as the answer
-  grows and is removed once the answer is tall enough.
-- Keeps that room when Chat re-engages tail following (for example after the
-  reader scrolls up and back down), because at the minimal room the floor is
-  the anchored position and following produces no movement.
-- Hands control back on wheel, touch, pointer, or scroll keys; ignores history
-  loads and session switches; cleans up when the column changes or the plugin
-  is disabled.
-- Adds a hidden diagnostic record on `window.__dshChatAnchor`.
+- 发送瞬间就完成锚定：瞄准本地回声气泡，不等服务端回显。
+- 短回复也能停在顶部：只补出滚动范围所需的最小底部留白，随回复增长按 1:1 收缩，回复填满屏幕后归零。
+- 读者滚回底部、Chat 重新打开跟随时保留留白——此时留白已是最小量，“底部”就是锚点位置，跟随不会产生位移。
+- 滚轮、触摸、点击、翻页键都会交还控制权；加载历史、切换会话不会误触发；切视图或禁用插件时自动清理。
+- 在 `window.__dshChatAnchor` 上提供诊断记录。
