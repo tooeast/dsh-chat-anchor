@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Anchor the newest prompt",
+    "description": "Pins each new prompt to the top of the transcript so the answer grows downward instead of the page following its bottom"
+  }
+}

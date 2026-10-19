@@ -1,0 +1,59 @@
+{
+  "name": "dsh-chat-anchor",
+  "version": "1.7.0",
+  "description": "Keep the newest prompt at the top of the DeepSeek Harness transcript while the answer streams (Codex-style anchoring)",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg",
+    "README.md",
+    "LICENSE"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": []
+    }
+  },
+  "engines": {
+    "dsh": ">=0.2.1-rc.2 <0.3.0"
+  },
+  "scripts": {
+    "check": "node --check index.js && node --check client.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sansiro/dsh-chat-anchor.git"
+  },
+  "homepage": "https://github.com/sansiro/dsh-chat-anchor#readme",
+  "bugs": {
+    "url": "https://github.com/sansiro/dsh-chat-anchor/issues"
+  },
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "chat",
+    "transcript",
+    "scroll",
+    "anchor",
+    "ux"
+  ],
+  "license": "MIT"
+}
