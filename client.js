@@ -49,14 +49,13 @@ window.__ModuleLoader__.load({
       + 'height:var(--chat-anchor-space,0px);pointer-events:none}'
 
     return {
-      inject: ['slots'],
       apply(ctx) {
         const doc = document
         const win = window
         if (typeof win.MutationObserver !== 'function' || typeof win.requestAnimationFrame !== 'function') return
 
         const debug = {
-          version: '1.7.0',
+          version: '1.7.1',
           appliedAt: Date.now(),
           columns: 0,
           batches: 0,
@@ -447,12 +446,6 @@ window.__ModuleLoader__.load({
             debug.columns = 0
           }
         })
-
-        // Invisible registration: proves this Client module applied in the live
-        // page without adding any chrome, and disappears with the plugin.
-        ctx.slots.inject('shell.overlay', () => ctx.slots.register({
-          name: 'shell.overlay', id: 'chat-anchor', order: 900, label: 'chat-anchor 1.7.0',
-        }, () => null))
       },
     }
   },

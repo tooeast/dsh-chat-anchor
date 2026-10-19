@@ -1,6 +1,6 @@
 {
   "name": "dsh-chat-anchor",
-  "version": "1.7.0",
+  "version": "1.7.1",
   "description": "把最新提问固定在聊天区顶部、回复向下生长，页面不再跟随滚动（Codex 风格）",
   "type": "module",
   "main": "index.js",
