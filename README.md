@@ -1,3 +1,5 @@
+中文 | [English](README.en.md)
+
 # dsh-chat-anchor
 
 **让 DeepSeek Harness 的网页聊天像 Codex 一样阅读：你刚发出的那条消息固定在聊天区顶部，回复向下生长，页面不再跟着滚到底部。**
