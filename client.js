@@ -291,7 +291,7 @@ window.__ModuleLoader__.load({
           const from = scroller.scrollTop
           const reduceMotion = typeof win.matchMedia === 'function'
             && win.matchMedia('(prefers-reduced-motion: reduce)').matches
-          const duration = reduceMotion ? 0 : 300
+          const duration = reduceMotion ? 0 : 450
           let settled = duration === 0
           debug.pins += 1
           note({
