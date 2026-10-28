@@ -76,7 +76,7 @@ publishes:
 | `[data-submission-echo]` | the local echo rendered on send |
 | `[data-chat-following-tail]` | present on the frame while tail following is on |
 
-It scrolls the row to the top of the scrollport (16px clearance). Chat
+It scrolls the row near the top of the scrollport (96px clearance), which leaves the tail of the previous message visible above it. Chat
 attributes scroll movement against its last acknowledged position, so the move
 reads as reader movement and its sampling interval releases the follow intent.
 The bottom room a short answer needs comes from a `::after` rule on the message

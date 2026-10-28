@@ -32,8 +32,13 @@
 window.__ModuleLoader__.load({
   id: 'dsh-chat-anchor',
   factory(require) {
-    /** Distance kept above the pinned prompt, in CSS pixels. */
-    const PIN_OFFSET = 16
+    /**
+     * Distance kept above the pinned prompt, in CSS pixels. Larger than the
+     * prompt's own gap on purpose: the space above shows the tail of the
+     * previous message, so the prompt is anchored just below it instead of
+     * sitting flush against the viewport top.
+     */
+    const PIN_OFFSET = 96
     /** Room kept between the pinned viewport foot and the sticky composer. */
     const COMPOSER_MARGIN = 48
     /** Give up on one prompt after a very long turn, instead of pinning forever. */

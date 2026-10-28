@@ -63,7 +63,7 @@ dsh plugin --profile web add dsh-chat-anchor
 | `[data-submission-echo]` | 发送时先渲染的本地回声 |
 | `[data-chat-following-tail]` | 跟随底部时，聊天框架上会有这个属性 |
 
-插件把消息行滚到滚动区顶部（留 16px），Chat 会把这次位移判定为“读者移动”，从而释放跟随意图。短回复所需的底部留白由消息列上的 `::after` 规则（`--chat-anchor-space` 变量）提供，位置在 sticky 输入框之前，所以输入框始终停在窗口底部。
+插件把消息行滚到滚动区顶部（留 96px，让上一条消息的尾巴还看得见），Chat 会把这次位移判定为“读者移动”，从而释放跟随意图。短回复所需的底部留白由消息列上的 `::after` 规则（`--chat-anchor-space` 变量）提供，位置在 sticky 输入框之前，所以输入框始终停在窗口底部。
 
 具体行为和边界条件写在 [CHANGELOG](CHANGELOG.md) 和 [client.js](client.js) 的注释里。
 
