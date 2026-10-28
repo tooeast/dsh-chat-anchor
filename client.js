@@ -38,7 +38,7 @@ window.__ModuleLoader__.load({
      * previous message, so the prompt is anchored just below it instead of
      * sitting flush against the viewport top.
      */
-    const PIN_OFFSET = 96
+    const PIN_OFFSET = 160
     /** Room kept between the pinned viewport foot and the sticky composer. */
     const COMPOSER_MARGIN = 48
     /** Give up on one prompt after a very long turn, instead of pinning forever. */
@@ -288,6 +288,11 @@ window.__ModuleLoader__.load({
             },
           }
           const started = win.performance.now()
+          const from = scroller.scrollTop
+          const reduceMotion = typeof win.matchMedia === 'function'
+            && win.matchMedia('(prefers-reduced-motion: reduce)').matches
+          const duration = reduceMotion ? 0 : 300
+          let settled = duration === 0
           debug.pins += 1
           note({
             type: 'pin',
@@ -305,8 +310,22 @@ window.__ModuleLoader__.load({
             }
             const m = measure(scroller, host, row, 'pin')
             applySpace(host, m.space)
-            if (Math.abs(m.ideal - scroller.scrollTop) > 1.5) scroller.scrollTop = m.ideal
-            else if (m.ideal === 0 && scroller.scrollTop === 0 && following(row)) scroller.scrollTop = 1
+            if (!settled) {
+              // Ease toward the live target: content can grow during the glide,
+              // and the target tracks it frame by frame.
+              const t = Math.min(1, (win.performance.now() - started) / duration)
+              const eased = 1 - (1 - t) ** 3
+              const target = from + (m.ideal - from) * eased
+              if (Math.abs(target - scroller.scrollTop) > 0.5) scroller.scrollTop = target
+              if (t >= 1) {
+                settled = true
+                if (Math.abs(m.ideal - scroller.scrollTop) > 0.5) scroller.scrollTop = m.ideal
+              }
+            } else if (Math.abs(m.ideal - scroller.scrollTop) > 1.5) {
+              scroller.scrollTop = m.ideal
+            } else if (m.ideal === 0 && scroller.scrollTop === 0 && following(row)) {
+              scroller.scrollTop = 1
+            }
             if (m.atTop && !following(row)) {
               stopPin()
               maintain(row, scroller, host)
