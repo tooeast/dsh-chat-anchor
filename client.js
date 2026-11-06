@@ -60,7 +60,7 @@ window.__ModuleLoader__.load({
         if (typeof win.MutationObserver !== 'function' || typeof win.requestAnimationFrame !== 'function') return
 
         const debug = {
-          version: '1.7.5',
+          version: '1.7.6',
           appliedAt: Date.now(),
           columns: 0,
           batches: 0,
@@ -83,10 +83,19 @@ window.__ModuleLoader__.load({
         let disposed = false
         /** The running pin loop, when one is active. */
         let run = null
+        /** Last position each scroller was seen at, used to undo Chat's follow jump. */
+        const scrollMemory = new WeakMap()
+        const watchedScrollers = new WeakSet()
         /** The room-maintenance owner, when one is kept after a pin. */
         let spaced = null
         /** The message column currently carrying the bottom-room attribute. */
         let spaceHost = null
+        /** Anchored prompt per Session, so a switch back can rebuild the room. */
+        const anchors = new Map()
+        /** Timer of the restore loop. */
+        let restoreTimer = null
+        /** Gesture listeners that cancel a restore. */
+        let restoreGestures = null
 
         /** Whether an element is one human Chat row. */
         const isUserRow = (node) => node instanceof win.Element
@@ -112,6 +121,9 @@ window.__ModuleLoader__.load({
           }
           return max
         }
+
+        /** Stable Chat node key of a row, or null when it has none. */
+        const nodeKeyOf = (row) => row.getAttribute('data-chat-node-key')
 
         /** Conversation identity that owns a row; a change resets the turn space. */
         const sessionOf = (row) => {
@@ -242,7 +254,16 @@ window.__ModuleLoader__.load({
               return
             }
             const { space } = measure(spaced.scroller, spaced.host, spaced.row, 'keep')
-            if (space <= 0) { clearSpace(); return }
+            const session = sessionOf(spaced.row)
+            const key = nodeKeyOf(spaced.row)
+            if (space <= 0) {
+              if (session !== '') anchors.delete(session)
+              clearSpace()
+              return
+            }
+            if (session !== '' && key !== null) {
+              anchors.set(session, { key, turn: turnOf(spaced.row) })
+            }
             applySpace(spaced.host, space)
           }
           const ro = new win.ResizeObserver(update)
@@ -250,6 +271,82 @@ window.__ModuleLoader__.load({
           ro.observe(scroller)
           spaced = { row, scroller, host, ro }
           update()
+        }
+
+        /** Find the anchored row anywhere in the document. */
+        const findAnchoredRow = (session, key, turn) => {
+          let fallback = null
+          for (const candidate of doc.querySelectorAll('[data-chat-node-key], [data-chat-flow-kind="user"]')) {
+            if (sessionOf(candidate) !== session) continue
+            if (candidate.getAttribute('data-chat-node-key') === key) return candidate
+            if (fallback === null && turn >= 0
+              && candidate.getAttribute('data-chat-flow-kind') === 'user'
+              && turnOf(candidate) === turn) fallback = candidate
+          }
+          return fallback
+        }
+
+        /** Drop the restore loop and its gesture listeners. */
+        const cancelRestore = () => {
+          if (restoreTimer !== null) {
+            win.clearTimeout(restoreTimer)
+            restoreTimer = null
+          }
+          if (restoreGestures !== null) {
+            const { scroller, handler } = restoreGestures
+            restoreGestures = null
+            for (const type of ['wheel', 'touchstart', 'pointerdown', 'keydown']) {
+              scroller.removeEventListener(type, handler, true)
+            }
+          }
+        }
+
+        /**
+         * Rebuild a Session's room after switching back.
+         *
+         * The room lives on the message column, which a switch throws away;
+         * Chat's own restore only brings back a scroll position. Re-apply the
+         * room and the anchored offset once the row is back, and keep
+         * re-applying briefly so a later Chat restore cannot override it.
+         */
+        const restoreFor = (el, session) => {
+          const anchor = anchors.get(session)
+          if (anchor === undefined || disposed) return
+          cancelRestore()
+          const started = win.performance.now()
+          const check = () => {
+            restoreTimer = null
+            if (disposed || !el.isConnected || sessionOf(el) !== session) {
+              cancelRestore()
+              return
+            }
+            const row = findAnchoredRow(session, anchor.key, anchor.turn ?? -1)
+            if (row !== null) {
+              const scroller = scrollerFor(row)
+              const host = roomHostFor(row)
+              if (scroller !== null && host !== null) {
+                const m = measure(scroller, host, row, 'pin')
+                if (m.space > 0) {
+                  applySpace(host, Math.max(m.space, spaceOf(host)))
+                  if (Math.abs(m.ideal - scroller.scrollTop) > 1) scroller.scrollTop = m.ideal
+                  maintain(row, scroller, host)
+                  if (restoreGestures === null) {
+                    const handler = () => { cancelRestore() }
+                    for (const type of ['wheel', 'touchstart', 'pointerdown', 'keydown']) {
+                      scroller.addEventListener(type, handler, { passive: true, capture: true })
+                    }
+                    restoreGestures = { scroller, handler }
+                  }
+                }
+              }
+            }
+            if (win.performance.now() - started < 4000) {
+              restoreTimer = win.setTimeout(check, 120)
+            } else {
+              cancelRestore()
+            }
+          }
+          check()
         }
 
         /** Stop the active pin loop and detach its gesture listeners. */
@@ -270,6 +367,14 @@ window.__ModuleLoader__.load({
           if (disposed || !row.isConnected) return
           const scroller = scrollerFor(row)
           if (scroller === null) return
+          // Chat's follow can move the scroller inside the commit that produced
+          // this row. Put it back where the reader last saw it before painting,
+          // so the glide starts from there instead of from the target.
+          const known = scrollMemory.get(scroller)
+          const seen = known !== undefined && Math.abs(known - scroller.scrollTop) > 1.5
+            ? known
+            : scroller.scrollTop
+          if (seen !== scroller.scrollTop) scroller.scrollTop = seen
           const host = roomHostFor(row)
           const events = ['wheel', 'touchstart', 'pointerdown', 'keydown']
           const onGesture = () => {
@@ -290,10 +395,11 @@ window.__ModuleLoader__.load({
             },
           }
           const started = win.performance.now()
-          const from = scroller.scrollTop
+          let startTop = seen
+          let tweenStart = null
           const reduceMotion = typeof win.matchMedia === 'function'
             && win.matchMedia('(prefers-reduced-motion: reduce)').matches
-          const duration = reduceMotion ? 0 : 450
+          const duration = reduceMotion ? 0 : 600
           let settled = duration === 0
           debug.pins += 1
           note({
@@ -314,11 +420,17 @@ window.__ModuleLoader__.load({
             state.ideal = m.ideal
             applySpace(host, m.space)
             if (!settled) {
-              // Ease toward the live target: content can grow during the glide,
-              // and the target tracks it frame by frame.
-              const t = Math.min(1, (win.performance.now() - started) / duration)
-              const eased = 1 - (1 - t) ** 3
-              const target = from + (m.ideal - from) * eased
+              // Time the glide from the first painted frame, not from the send:
+              // the first frame can arrive late while the answer renders, which
+              // used to consume the whole duration and turn the glide into a
+              // single-frame jump. The start position is read here too, so a
+              // follow that ran in between is absorbed instead of jumped over.
+              if (tweenStart === null) {
+                tweenStart = win.performance.now()
+              }
+              const t = Math.min(1, (win.performance.now() - tweenStart) / duration)
+              const eased = t < 0.5 ? 4 * t * t * t : 1 - ((-2 * t + 2) ** 3) / 2
+              const target = startTop + (m.ideal - startTop) * eased
               if (Math.abs(target - scroller.scrollTop) > 0.5) scroller.scrollTop = target
               if (t >= 1) {
                 settled = true
@@ -328,6 +440,13 @@ window.__ModuleLoader__.load({
               scroller.scrollTop = m.ideal
             } else if (m.ideal === 0 && scroller.scrollTop === 0 && following(row)) {
               scroller.scrollTop = 1
+            }
+            if (settled && Math.abs(m.ideal - scroller.scrollTop) <= 2) {
+              const session = sessionOf(row)
+              const key = nodeKeyOf(row)
+              if (session !== '' && key !== null) {
+                anchors.set(session, { key, turn: turnOf(row) })
+              }
             }
             if (m.atTop && !following(row)) {
               stopPin()
@@ -449,7 +568,15 @@ window.__ModuleLoader__.load({
           }
           state.observer = new win.MutationObserver((records) => { onMutations(state, records) })
           state.observer.observe(el, { childList: true, subtree: true })
+          const scroller = scrollerFor(el)
+          if (scroller !== null && !watchedScrollers.has(scroller)) {
+            watchedScrollers.add(scroller)
+            scroller.addEventListener('scroll', () => {
+              scrollMemory.set(scroller, scroller.scrollTop)
+            }, { passive: true })
+          }
           states.set(el, state)
+          restoreFor(el, state.session)
         }
 
         /** Bind every visible flow column and drop detached ones. */
@@ -462,10 +589,21 @@ window.__ModuleLoader__.load({
             bindColumn(el)
           }
           for (const [el, state] of states) {
-            if (live.has(el)) continue
-            state.observer.disconnect()
-            states.delete(el)
+            if (!live.has(el)) {
+              state.observer.disconnect()
+              states.delete(el)
+              clearSpace()
+              continue
+            }
+            // The same column can be reused for another Session: reset its turn
+            // space and rebuild the remembered room for what it now shows.
+            const session = sessionOf(el)
+            if (session === state.session) continue
+            state.session = session
+            state.maxTurn = maxTurnIn(el)
+            state.quietUntil = win.performance.now() + QUIET_MS
             clearSpace()
+            restoreFor(el, session)
           }
           debug.columns = states.size
         }
@@ -486,11 +624,19 @@ window.__ModuleLoader__.load({
           doc.head.appendChild(style)
           const rootObserver = new win.MutationObserver(scheduleScan)
           rootObserver.observe(doc.body, { childList: true, subtree: true })
+          // A Session switch can reveal an already-mounted column instead of
+          // changing the body's child list, so mutations alone miss it.
+          const pollTimer = win.setInterval(() => {
+            if (!disposed) scan()
+          }, 500)
           scan()
           return () => {
             disposed = true
             stopPin()
+            cancelRestore()
             clearSpace()
+            anchors.clear()
+            win.clearInterval(pollTimer)
             rootObserver.disconnect()
             if (scanFrame !== 0) win.cancelAnimationFrame(scanFrame)
             for (const state of states.values()) state.observer.disconnect()
