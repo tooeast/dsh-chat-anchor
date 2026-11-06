@@ -60,7 +60,7 @@ window.__ModuleLoader__.load({
         if (typeof win.MutationObserver !== 'function' || typeof win.requestAnimationFrame !== 'function') return
 
         const debug = {
-          version: '1.7.1',
+          version: '1.7.5',
           appliedAt: Date.now(),
           columns: 0,
           batches: 0,
@@ -211,7 +211,7 @@ window.__ModuleLoader__.load({
           const raw = scroller.scrollTop + rowTop - PIN_OFFSET
           const ideal = Math.max(0, raw)
           const viewport = scroller.clientHeight
-          const guard = mode === 'pin' ? COMPOSER_MARGIN + composerHeightOf(scroller) : 0
+          const guard = 0
           const need = Math.max(0, ideal + viewport + guard - contentHeight)
           return {
             space: Math.min(need, viewport * MAX_SPACE_VIEWPORTS),
@@ -280,11 +280,13 @@ window.__ModuleLoader__.load({
           for (const type of events) scroller.addEventListener(type, onGesture, { passive: true, capture: true })
           const state = {
             frame: 0,
+            ideal: null,
             row,
             scroller,
             host,
             release() {
               for (const type of events) scroller.removeEventListener(type, onGesture, true)
+              stopWatch()
             },
           }
           const started = win.performance.now()
@@ -309,6 +311,7 @@ window.__ModuleLoader__.load({
               return
             }
             const m = measure(scroller, host, row, 'pin')
+            state.ideal = m.ideal
             applySpace(host, m.space)
             if (!settled) {
               // Ease toward the live target: content can grow during the glide,
@@ -338,6 +341,31 @@ window.__ModuleLoader__.load({
             }
             state.frame = win.requestAnimationFrame(tick)
           }
+          // Called from the mutation observer, i.e. after Chat's own follow (which
+          // runs in the commit's layout phase) but before the browser paints:
+          // the room and position are corrected in the same frame, so the
+          // follow's offset never reaches the screen.
+          state.hold = () => {
+            if (!settled || run !== state) return
+            const m = measure(scroller, host, row, 'pin')
+            state.ideal = m.ideal
+            applySpace(host, m.space)
+            if (Math.abs(m.ideal - scroller.scrollTop) > 0.5) scroller.scrollTop = m.ideal
+          }
+          // Position-only correction for follows caused by layout (folds, size
+          // changes) rather than DOM childList mutations. It never resizes the
+          // room, so it cannot re-trigger itself.
+          state.fix = () => {
+            if (!settled || run !== state || state.ideal === null) return
+            if (Math.abs(state.ideal - scroller.scrollTop) > 0.5) scroller.scrollTop = state.ideal
+          }
+          let ro = null
+          if (typeof win.ResizeObserver === 'function') {
+            ro = new win.ResizeObserver(() => { state.fix() })
+            ro.observe(scroller)
+            if (host !== null) ro.observe(host)
+          }
+          const stopWatch = () => { if (ro !== null) { ro.disconnect(); ro = null } }
           run = state
           state.frame = win.requestAnimationFrame(tick)
         }
@@ -403,6 +431,7 @@ window.__ModuleLoader__.load({
             startPin(echoes[echoes.length - 1], 'echo')
             return
           }
+          if (run !== null) run.hold()
           if (added.length === 0) return
           debug.userAdds += added.length
           consider(state, added[added.length - 1])
